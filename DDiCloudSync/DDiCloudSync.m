@@ -32,7 +32,11 @@ NSString *kDDiCloudDidSyncNotification = @"DDiCloudSyncDidUpdateToLatest";
     NSDictionary *dictInCloud = [iCloudStore dictionaryRepresentation];
     NSDictionary *dict = [[NSUserDefaults standardUserDefaults] dictionaryRepresentation];
     
-    if(self.delegate) {
+    [[NSNotificationCenter defaultCenter] removeObserver:self
+                                                    name:NSUbiquitousKeyValueStoreDidChangeExternallyNotification
+                                                  object:nil];
+    
+    if([self.delegate respondsToSelector:@selector(mergedDefaultsForUpdatingCloud:withLocalDefaults:)]) {
         dict = [self.delegate mergedDefaultsForUpdatingCloud:dictInCloud withLocalDefaults:dict];
     }
     
@@ -44,6 +48,11 @@ NSString *kDDiCloudDidSyncNotification = @"DDiCloudSyncDidUpdateToLatest";
     //sync
     self.lastSyncedDict = dict;
     [[NSUbiquitousKeyValueStore defaultStore] synchronize];
+    
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(updateFromiCloud:)
+                                                 name:NSUbiquitousKeyValueStoreDidChangeExternallyNotification
+                                               object:nil];
 }
 
 - (void)updateFromiCloud:(NSNotification*) notificationObject {
@@ -51,22 +60,22 @@ NSString *kDDiCloudDidSyncNotification = @"DDiCloudSyncDidUpdateToLatest";
     NSDictionary *dictInCloud = [iCloudStore dictionaryRepresentation];
     NSDictionary *dict = [[NSUserDefaults standardUserDefaults] dictionaryRepresentation];
     
-    if(self.delegate) {
-        dict = [self.delegate mergedDefaultsForUpdatingLocalDefaults:dict withCloud:dictInCloud];
-    }
-    
     // prevent NSUserDefaultsDidChangeNotification from being posted while we update from iCloud
     [[NSNotificationCenter defaultCenter] removeObserver:self
                                                     name:NSUserDefaultsDidChangeNotification
                                                   object:nil];
     
+    if([self.delegate respondsToSelector:@selector(mergedDefaultsForUpdatingLocalDefaults:withCloud:)]) {
+        dictInCloud = [self.delegate mergedDefaultsForUpdatingLocalDefaults:dict withCloud:dictInCloud];
+    }
+    
     //update defaults
-    [dict enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
+    [dictInCloud enumerateKeysAndObjectsUsingBlock:^(id key, id obj, BOOL *stop) {
         [[NSUserDefaults standardUserDefaults] setObject:obj forKey:key];
     }];
     
     //sync to disk
-    self.lastSyncedDict = dict;
+    self.lastSyncedDict = dictInCloud;
     [[NSUserDefaults standardUserDefaults] synchronize];
     
     // enable NSUserDefaultsDidChangeNotification notifications again
@@ -96,7 +105,9 @@ NSString *kDDiCloudDidSyncNotification = @"DDiCloudSyncDidUpdateToLatest";
             
             [[NSNotificationCenter defaultCenter] addObserver:self
                                                      selector:@selector(updateToiCloud:)
-                                                         name:NSUserDefaultsDidChangeNotification                                                    object:nil];
+                                                         name:NSUserDefaultsDidChangeNotification
+                                                       object:nil];
+            
 #if TARGET_IPHONE_SIMULATOR
 #else
         } else {
@@ -111,6 +122,16 @@ NSString *kDDiCloudDidSyncNotification = @"DDiCloudSyncDidUpdateToLatest";
 
 - (void)stop {
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
+- (void)forceUpdateFromiCloud
+{
+    [self updateFromiCloud:nil];
+}
+
+- (void)forceUpdateToiCloud
+{
+    [self updateToiCloud:nil];
 }
 
 - (void) dealloc {
