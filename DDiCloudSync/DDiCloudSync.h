@@ -27,6 +27,7 @@
 
 @protocol DDiCloudSyncDelegate <NSObject>
 
+@optional
 - (NSDictionary*)mergedDefaultsForUpdatingCloud:(NSDictionary*)dictInCloud withLocalDefaults:(NSDictionary*)dict;
 - (NSDictionary*)mergedDefaultsForUpdatingLocalDefaults:(NSDictionary*)dict withCloud:(NSDictionary*)dictInCloud;
 
@@ -35,6 +36,8 @@
 + (DDiCloudSync*)sharedSync;
 - (void)start;
 - (void)stop;
+- (void)forceUpdateFromiCloud;
+- (void)forceUpdateToiCloud;
 #if !__has_feature(objc_arc)
 @property(assign) id<DDiCloudSyncDelegate> delegate;
 #else
